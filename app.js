@@ -13,6 +13,16 @@
   let currentCardText = null;
   let cardCount = 30;
   let busy = false;
+  let difficulty = 0;
+  let lengthP75 = 0;
+  let lengthP90 = 0;
+  let reallyLongCards = [];
+  let isTouchDevice = false;
+
+  // Swipe state
+  let dragStartY = 0;
+  let dragCurrentY = 0;
+  let dragging = false;
 
   // ── DOM refs ──
   const $ = (sel) => document.querySelector(sel);
@@ -23,6 +33,9 @@
   const cardCountInput = $('#card-count');
   const timerRange = $('#timer-range');
   const timerInput = $('#timer-limit');
+  const difficultyRange = $('#difficulty-range');
+  const difficultyValue = $('#difficulty-value');
+  const difficultyHint = $('#difficulty-hint');
   const startBtn = $('#start-btn');
   const roundBadge = $('#round-badge');
   const timerDisplay = $('#timer-display');
@@ -40,6 +53,14 @@
   const btnGuessed = $('#btn-guessed');
   const btnSkip = $('#btn-skip');
   const gameArea = $('#game-area');
+  const actionFlash = $('#action-flash');
+
+  const DIFFICULTY_HINTS = {
+    0: 'Náhodný výběr karet',
+    1: 'Mírná preference delších jmen',
+    2: 'Častěji delší a složitější jména',
+    3: 'Minimálně 20 % velmi dlouhých jmen',
+  };
 
   // ── Init ──
   async function init() {
@@ -47,6 +68,7 @@
       const res = await fetch('cards.txt');
       const text = await res.text();
       allCards = text.split('\n').map((l) => l.trim()).filter(Boolean);
+      buildLengthTiers();
     } catch {
       startBtn.disabled = true;
       startBtn.textContent = 'Nelze načíst karty (cards.txt)';
@@ -55,10 +77,17 @@
 
     syncInputs(cardCountRange, cardCountInput, 10, 50);
     syncInputs(timerRange, timerInput, 15, 180);
+    setupDifficultySlider();
+
+    isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (isTouchDevice) {
+      document.body.classList.add('touch-device');
+      setupCardSwipe();
+    }
 
     startBtn.addEventListener('click', startGame);
-    btnGuessed.addEventListener('click', (e) => { e.stopPropagation(); onGuessed(); });
-    btnSkip.addEventListener('click', (e) => { e.stopPropagation(); onSkip(); });
+    btnGuessed.addEventListener('click', (e) => { e.stopPropagation(); triggerGuessed(); });
+    btnSkip.addEventListener('click', (e) => { e.stopPropagation(); triggerSkip(); });
 
     tapOverlay.addEventListener('click', onTapOverlay);
     timeupOverlay.addEventListener('click', onTapOverlay);
@@ -90,8 +119,149 @@
     return a;
   }
 
+  function setupDifficultySlider() {
+    const update = () => {
+      difficultyValue.textContent = difficultyRange.value;
+      difficultyHint.textContent = DIFFICULTY_HINTS[difficultyRange.value];
+    };
+    difficultyRange.addEventListener('input', update);
+    update();
+  }
+
+  function buildLengthTiers() {
+    const sorted = allCards.map((c) => c.length).sort((a, b) => a - b);
+    lengthP75 = sorted[Math.floor(sorted.length * 0.75)];
+    lengthP90 = sorted[Math.floor(sorted.length * 0.9)];
+    reallyLongCards = allCards.filter((c) => c.length >= lengthP90);
+  }
+
+  function cardWeight(card, level) {
+    if (card.length >= lengthP90) {
+      return level === 1 ? 3 : level === 2 ? 7 : 5;
+    }
+    if (card.length >= lengthP75) {
+      return level === 1 ? 2 : level === 2 ? 4 : 3;
+    }
+    return 1;
+  }
+
+  function weightedPick(pool, exclude, level) {
+    const available = pool.filter((c) => !exclude.has(c));
+    if (available.length === 0) return null;
+
+    let total = 0;
+    const weights = available.map((c) => {
+      const w = cardWeight(c, level);
+      total += w;
+      return w;
+    });
+
+    let r = Math.random() * total;
+    for (let i = 0; i < available.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return available[i];
+    }
+    return available[available.length - 1];
+  }
+
+  function pickCards(n, level) {
+    if (level === 0) return pickRandom(allCards, n);
+
+    const picked = new Set();
+    const result = [];
+
+    if (level >= 3) {
+      const minLong = Math.ceil(n * 0.2);
+      for (const card of shuffle(reallyLongCards)) {
+        if (result.length >= minLong) break;
+        picked.add(card);
+        result.push(card);
+      }
+    }
+
+    while (result.length < n) {
+      const card = weightedPick(allCards, picked, level);
+      if (!card) break;
+      picked.add(card);
+      result.push(card);
+    }
+
+    return shuffle(result);
+  }
+
   function pickRandom(arr, n) {
     return shuffle(arr).slice(0, n);
+  }
+
+  function flashAction(type) {
+    actionFlash.hidden = false;
+    actionFlash.className = 'action-flash flash-' + type;
+    void actionFlash.offsetWidth;
+    actionFlash.classList.add('active');
+    setTimeout(() => {
+      actionFlash.classList.remove('active');
+      setTimeout(() => { actionFlash.hidden = true; }, 180);
+    }, 160);
+  }
+
+  function skipFlashType() {
+    return currentRound === 2 ? 'skip' : 'danger';
+  }
+
+  function triggerGuessed() {
+    if (gamePhase !== 'playing' || busy) return;
+    flashAction('success');
+    onGuessed();
+  }
+
+  function triggerSkip() {
+    if (gamePhase !== 'playing' || busy) return;
+    flashAction(skipFlashType());
+    onSkip();
+  }
+
+  function resetCardDrag() {
+    dragging = false;
+    currentCard.classList.remove('dragging', 'swipe-hint-up', 'swipe-hint-down', 'skip-turn-hint');
+    currentCard.style.transform = '';
+    currentCard.style.opacity = '';
+  }
+
+  function setupCardSwipe() {
+    const SWIPE_THRESHOLD = 70;
+
+    currentCard.addEventListener('touchstart', (e) => {
+      if (gamePhase !== 'playing' || busy) return;
+      dragging = true;
+      dragStartY = e.touches[0].clientY;
+      dragCurrentY = dragStartY;
+      currentCard.classList.add('dragging');
+    }, { passive: true });
+
+    currentCard.addEventListener('touchmove', (e) => {
+      if (!dragging) return;
+      dragCurrentY = e.touches[0].clientY;
+      const dy = dragCurrentY - dragStartY;
+      const clamped = Math.max(-120, Math.min(120, dy));
+      currentCard.style.transform = `translateY(${clamped}px) rotate(${clamped * 0.04}deg)`;
+      currentCard.style.opacity = String(1 - Math.abs(clamped) / 280);
+
+      currentCard.classList.toggle('swipe-hint-up', dy < -25);
+      currentCard.classList.toggle('swipe-hint-down', dy > 25);
+      currentCard.classList.toggle('skip-turn-hint', dy > 25 && currentRound === 2);
+    }, { passive: true });
+
+    const endDrag = () => {
+      if (!dragging) return;
+      const dy = dragCurrentY - dragStartY;
+      resetCardDrag();
+
+      if (dy < -SWIPE_THRESHOLD) triggerGuessed();
+      else if (dy > SWIPE_THRESHOLD) triggerSkip();
+    };
+
+    currentCard.addEventListener('touchend', endDrag);
+    currentCard.addEventListener('touchcancel', resetCardDrag);
   }
 
   function vibrateThree() {
@@ -159,8 +329,9 @@
   function startGame() {
     cardCount = parseInt(cardCountInput.value, 10);
     timerLimit = parseInt(timerInput.value, 10);
+    difficulty = parseInt(difficultyRange.value, 10);
 
-    selectedCards = pickRandom(allCards, cardCount);
+    selectedCards = pickCards(cardCount, difficulty);
     doneCards = [];
     currentRound = 1;
     currentCardText = null;
@@ -234,6 +405,7 @@
     currentCardText = card;
     cardText.textContent = card;
 
+    resetCardDrag();
     playZone.hidden = false;
     currentCard.className = 'game-card enter';
 
@@ -253,6 +425,8 @@
         settled = true;
         currentCard.removeEventListener('animationend', onEnd);
         currentCard.className = 'game-card';
+        currentCard.style.transform = '';
+        currentCard.style.opacity = '';
         resolve();
       };
 

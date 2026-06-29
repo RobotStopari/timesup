@@ -90,6 +90,33 @@ html, body {
   flex-shrink: 0;
 }
 
+.difficulty-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.difficulty-row .form-range {
+  flex: 1;
+}
+
+.difficulty-value {
+  width: 28px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.difficulty-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  min-height: 2.5em;
+}
+
 .start-btn {
   margin-top: 0.5rem;
   border-radius: 14px;
@@ -193,6 +220,37 @@ html, body {
   padding: 1rem 1.25rem 1.5rem;
   position: relative;
   overflow: hidden;
+}
+
+/* ── Action flash ── */
+
+.action-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 20;
+  transition: opacity 0.12s ease-out;
+}
+
+.action-flash.active {
+  opacity: 0.35;
+}
+
+.action-flash.flash-success {
+  background: var(--success);
+}
+
+.action-flash.flash-danger {
+  background: var(--danger);
+}
+
+.action-flash.flash-skip {
+  background: #f97316;
+}
+
+.action-flash[hidden] {
+  display: none !important;
 }
 
 /* ── Overlays ── */
@@ -307,6 +365,29 @@ html, body {
   transform-origin: center center;
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
               opacity 0.35s ease;
+  touch-action: none;
+  user-select: none;
+}
+
+.touch-device .game-card {
+  cursor: grab;
+}
+
+.game-card.dragging {
+  transition: none;
+  cursor: grabbing;
+}
+
+.game-card.swipe-hint-up {
+  box-shadow: 0 -4px 24px rgba(34, 197, 94, 0.35), var(--shadow);
+}
+
+.game-card.swipe-hint-down {
+  box-shadow: 0 4px 24px rgba(239, 68, 68, 0.35), var(--shadow);
+}
+
+.game-card.swipe-hint-down.skip-turn-hint {
+  box-shadow: 0 4px 24px rgba(249, 115, 22, 0.35), var(--shadow);
 }
 
 .card-text {

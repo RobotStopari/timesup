@@ -33,6 +33,15 @@
         </div>
       </div>
 
+      <div class="setting-group">
+        <label for="difficulty-range" class="form-label">Obtížnost</label>
+        <div class="difficulty-row">
+          <input type="range" class="form-range" id="difficulty-range" min="0" max="3" step="1" value="0">
+          <span class="difficulty-value" id="difficulty-value">0</span>
+        </div>
+        <p class="difficulty-hint" id="difficulty-hint">Náhodný výběr karet</p>
+      </div>
+
       <button id="start-btn" class="btn btn-primary btn-lg w-100 start-btn">Začít hru</button>
     </div>
   </div>
@@ -50,6 +59,8 @@
     </div>
 
     <div class="game-area" id="game-area">
+      <div id="action-flash" class="action-flash" hidden></div>
+
       <!-- Tap overlays -->
       <div class="overlay-message tap-overlay" id="tap-overlay">
         <div class="overlay-icon">👆</div>
