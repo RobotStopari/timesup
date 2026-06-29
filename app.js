@@ -36,6 +36,7 @@
   const difficultyRange = $('#difficulty-range');
   const difficultyValue = $('#difficulty-value');
   const difficultyHint = $('#difficulty-hint');
+  const titioEdition = $('#titio-edition');
   const startBtn = $('#start-btn');
   const roundBadge = $('#round-badge');
   const timerDisplay = $('#timer-display');
@@ -62,6 +63,20 @@
     2: 'Častěji delší a složitější jména',
     3: 'Minimálně 20 % velmi dlouhých jmen',
   };
+
+  const TITIO_CARDS = [
+    'Opičák', 'Mája', 'Trissa', 'Robot', 'Šáša', 'Ent', 'Zombík',
+    'Klárka', 'Somyčka', '#PromiňKuba', 'Přezdívka', 'Můstek',
+    'Auťák (Dana)', 'Potkani', 'Lessie',
+  ];
+
+  // 50% none, ~49% one, ~1% two (never more)
+  function titioExtraCount() {
+    const roll = Math.random();
+    if (roll < 0.5) return 0;
+    if (roll < 0.99) return 1;
+    return 2;
+  }
 
   // ── Init ──
   async function init() {
@@ -191,6 +206,16 @@
 
   function pickRandom(arr, n) {
     return shuffle(arr).slice(0, n);
+  }
+
+  function maybeInjectTitioCards(cards) {
+    if (!titioEdition.checked) return cards;
+
+    const extraCount = titioExtraCount();
+    if (extraCount === 0) return cards;
+
+    const extras = shuffle(TITIO_CARDS).slice(0, extraCount);
+    return shuffle([...cards, ...extras]);
   }
 
   function flashAction(type) {
@@ -353,7 +378,7 @@
     timerLimit = parseInt(timerInput.value, 10);
     difficulty = parseInt(difficultyRange.value, 10);
 
-    selectedCards = pickCards(cardCount, difficulty);
+    selectedCards = maybeInjectTitioCards(pickCards(cardCount, difficulty));
     doneCards = [];
     currentRound = 1;
     currentCardText = null;
