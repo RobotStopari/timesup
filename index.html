@@ -7,7 +7,7 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="favicon.svg">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
@@ -17,6 +17,9 @@
       <header class="setup-header">
         <h1 class="app-title">Times Up!</h1>
         <p class="app-subtitle">Párty hra s kartami</p>
+        <button type="button" id="show-all-cards-btn" class="btn-all-cards">
+          Všechny karty
+        </button>
       </header>
 
       <div class="setup-panel">
@@ -115,6 +118,24 @@
     </div>
   </div>
 
-  <script src="app.js?v=2"></script>
+  <!-- All cards catalog -->
+  <div id="cards-modal" class="cards-modal" hidden aria-hidden="true">
+    <div class="cards-modal-panel">
+      <header class="cards-modal-header">
+        <div class="cards-modal-search-wrap">
+          <span class="cards-search-icon" aria-hidden="true">🔍</span>
+          <input type="search" id="cards-search" class="cards-search" placeholder="Hledat kartu…" autocomplete="off" enterkeyhint="search">
+        </div>
+        <button type="button" id="cards-modal-close" class="cards-modal-close" aria-label="Zavřít">×</button>
+      </header>
+      <p class="cards-modal-count" id="cards-count-label"></p>
+      <div class="cards-list-wrap">
+        <div class="cards-list" id="cards-list"></div>
+        <p class="cards-no-results" id="cards-no-results" hidden>Žádná karta nenalezena</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=4"></script>
 </body>
 </html>

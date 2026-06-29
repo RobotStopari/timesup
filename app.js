@@ -17,6 +17,7 @@
   let lengthP75 = 0;
   let lengthP90 = 0;
   let reallyLongCards = [];
+  let cardsCatalogBuilt = false;
 
   // Swipe state
   let dragStartY = 0;
@@ -38,6 +39,13 @@
   const difficultyHint = $('#difficulty-hint');
   const titioEdition = $('#titio-edition');
   const startBtn = $('#start-btn');
+  const showAllCardsBtn = $('#show-all-cards-btn');
+  const cardsModal = $('#cards-modal');
+  const cardsModalClose = $('#cards-modal-close');
+  const cardsSearch = $('#cards-search');
+  const cardsList = $('#cards-list');
+  const cardsCountLabel = $('#cards-count-label');
+  const cardsNoResults = $('#cards-no-results');
   const roundBadge = $('#round-badge');
   const timerDisplay = $('#timer-display');
   const timerBarFill = $('#timer-bar-fill');
@@ -88,12 +96,14 @@
     } catch {
       startBtn.disabled = true;
       startBtn.textContent = 'Nelze načíst karty (cards.txt)';
+      showAllCardsBtn.disabled = true;
       return;
     }
 
     syncInputs(cardCountRange, cardCountInput, 10, 50);
     syncInputs(timerRange, timerInput, 15, 180);
     setupDifficultySlider();
+    setupCardsCatalog();
 
     if (window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window) {
       document.body.classList.add('touch-device');
@@ -141,6 +151,91 @@
     };
     difficultyRange.addEventListener('input', update);
     update();
+  }
+
+  function normalizeSearch(text) {
+    return text.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+  }
+
+  function buildCardsCatalog() {
+    if (cardsCatalogBuilt) return;
+
+    const fragment = document.createDocumentFragment();
+    allCards.forEach((name, i) => {
+      const item = document.createElement('div');
+      item.className = 'catalog-card';
+      item.dataset.search = normalizeSearch(name);
+
+      const index = document.createElement('span');
+      index.className = 'catalog-index';
+      index.textContent = i + 1;
+
+      const label = document.createElement('span');
+      label.className = 'catalog-name';
+      label.textContent = name;
+
+      item.append(index, label);
+      fragment.appendChild(item);
+    });
+
+    cardsList.appendChild(fragment);
+    cardsCatalogBuilt = true;
+    cardsCountLabel.textContent = allCards.length + ' karet';
+  }
+
+  function filterCardsCatalog(query) {
+    const q = normalizeSearch(query.trim());
+    const items = cardsList.querySelectorAll('.catalog-card');
+    let visible = 0;
+
+    items.forEach((el) => {
+      const match = !q || el.dataset.search.includes(q);
+      el.classList.toggle('hidden', !match);
+      if (match) visible++;
+    });
+
+    if (q) {
+      cardsCountLabel.textContent = visible + ' / ' + allCards.length;
+    } else {
+      cardsCountLabel.textContent = allCards.length + ' karet';
+    }
+
+    cardsNoResults.hidden = visible > 0 || !q;
+  }
+
+  function openCardsCatalog() {
+    buildCardsCatalog();
+    cardsModal.hidden = false;
+    cardsModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+    cardsSearch.value = '';
+    filterCardsCatalog('');
+    requestAnimationFrame(() => {
+      cardsModal.classList.add('open');
+      cardsSearch.focus();
+    });
+  }
+
+  function closeCardsCatalog() {
+    cardsModal.classList.remove('open');
+    document.body.classList.remove('modal-open');
+    cardsSearch.blur();
+    setTimeout(() => {
+      cardsModal.hidden = true;
+      cardsModal.setAttribute('aria-hidden', 'true');
+    }, 300);
+  }
+
+  function setupCardsCatalog() {
+    showAllCardsBtn.addEventListener('click', openCardsCatalog);
+    cardsModalClose.addEventListener('click', closeCardsCatalog);
+    cardsSearch.addEventListener('input', () => filterCardsCatalog(cardsSearch.value));
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !cardsModal.hidden) {
+        closeCardsCatalog();
+      }
+    });
   }
 
   function buildLengthTiers() {
