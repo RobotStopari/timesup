@@ -17,12 +17,12 @@
   let lengthP75 = 0;
   let lengthP90 = 0;
   let reallyLongCards = [];
-  let isTouchDevice = false;
 
   // Swipe state
   let dragStartY = 0;
   let dragCurrentY = 0;
   let dragging = false;
+  let activePointerId = null;
 
   // ── DOM refs ──
   const $ = (sel) => document.querySelector(sel);
@@ -48,6 +48,7 @@
   const roundMessage = $('#round-message');
   const gameoverOverlay = $('#gameover-overlay');
   const playZone = $('#play-zone');
+  const cardStack = $('#card-stack');
   const currentCard = $('#current-card');
   const cardText = $('#card-text');
   const btnGuessed = $('#btn-guessed');
@@ -79,11 +80,10 @@
     syncInputs(timerRange, timerInput, 15, 180);
     setupDifficultySlider();
 
-    isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    if (isTouchDevice) {
+    if (window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window) {
       document.body.classList.add('touch-device');
-      setupCardSwipe();
     }
+    setupCardSwipe();
 
     startBtn.addEventListener('click', startGame);
     btnGuessed.addEventListener('click', (e) => { e.stopPropagation(); triggerGuessed(); });
@@ -222,46 +222,68 @@
 
   function resetCardDrag() {
     dragging = false;
+    activePointerId = null;
     currentCard.classList.remove('dragging', 'swipe-hint-up', 'swipe-hint-down', 'skip-turn-hint');
     currentCard.style.transform = '';
     currentCard.style.opacity = '';
+    currentCard.style.willChange = '';
+  }
+
+  function updateCardDragVisuals(dy) {
+    const clamped = Math.max(-140, Math.min(140, dy));
+    currentCard.style.willChange = 'transform, opacity';
+    currentCard.style.transform = `translateY(${clamped}px) rotate(${clamped * 0.04}deg)`;
+    currentCard.style.opacity = String(1 - Math.abs(clamped) / 300);
+    currentCard.classList.toggle('swipe-hint-up', dy < -20);
+    currentCard.classList.toggle('swipe-hint-down', dy > 20);
+    currentCard.classList.toggle('skip-turn-hint', dy > 20 && currentRound === 2);
   }
 
   function setupCardSwipe() {
-    const SWIPE_THRESHOLD = 70;
+    const SWIPE_THRESHOLD = 50;
+    const target = cardStack;
 
-    currentCard.addEventListener('touchstart', (e) => {
+    target.addEventListener('pointerdown', (e) => {
       if (gamePhase !== 'playing' || busy) return;
+      if (e.pointerType === 'mouse') return;
+
       dragging = true;
-      dragStartY = e.touches[0].clientY;
+      activePointerId = e.pointerId;
+      dragStartY = e.clientY;
       dragCurrentY = dragStartY;
       currentCard.classList.add('dragging');
-    }, { passive: true });
+      target.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
 
-    currentCard.addEventListener('touchmove', (e) => {
-      if (!dragging) return;
-      dragCurrentY = e.touches[0].clientY;
+    target.addEventListener('pointermove', (e) => {
+      if (!dragging || e.pointerId !== activePointerId) return;
+      e.preventDefault();
+      dragCurrentY = e.clientY;
+      updateCardDragVisuals(dragCurrentY - dragStartY);
+    });
+
+    const endDrag = (e) => {
+      if (!dragging || e.pointerId !== activePointerId) return;
+
       const dy = dragCurrentY - dragStartY;
-      const clamped = Math.max(-120, Math.min(120, dy));
-      currentCard.style.transform = `translateY(${clamped}px) rotate(${clamped * 0.04}deg)`;
-      currentCard.style.opacity = String(1 - Math.abs(clamped) / 280);
-
-      currentCard.classList.toggle('swipe-hint-up', dy < -25);
-      currentCard.classList.toggle('swipe-hint-down', dy > 25);
-      currentCard.classList.toggle('skip-turn-hint', dy > 25 && currentRound === 2);
-    }, { passive: true });
-
-    const endDrag = () => {
-      if (!dragging) return;
-      const dy = dragCurrentY - dragStartY;
+      if (target.hasPointerCapture(e.pointerId)) {
+        target.releasePointerCapture(e.pointerId);
+      }
       resetCardDrag();
 
       if (dy < -SWIPE_THRESHOLD) triggerGuessed();
       else if (dy > SWIPE_THRESHOLD) triggerSkip();
     };
 
-    currentCard.addEventListener('touchend', endDrag);
-    currentCard.addEventListener('touchcancel', resetCardDrag);
+    target.addEventListener('pointerup', endDrag);
+    target.addEventListener('pointercancel', (e) => {
+      if (!dragging || e.pointerId !== activePointerId) return;
+      if (target.hasPointerCapture(e.pointerId)) {
+        target.releasePointerCapture(e.pointerId);
+      }
+      resetCardDrag();
+    });
   }
 
   function vibrateThree() {

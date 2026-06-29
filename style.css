@@ -220,6 +220,7 @@ html, body {
   padding: 1rem 1.25rem 1.5rem;
   position: relative;
   overflow: hidden;
+  touch-action: pan-x pan-y;
 }
 
 /* ── Action flash ── */
@@ -349,6 +350,8 @@ html, body {
   perspective: 800px;
   position: relative;
   min-height: 200px;
+  touch-action: none;
+  -webkit-touch-callout: none;
 }
 
 .game-card {
@@ -374,8 +377,10 @@ html, body {
 }
 
 .game-card.dragging {
-  transition: none;
+  animation: none !important;
+  transition: none !important;
   cursor: grabbing;
+  z-index: 5;
 }
 
 .game-card.swipe-hint-up {
@@ -395,6 +400,7 @@ html, body {
   font-weight: 700;
   line-height: 1.35;
   word-break: break-word;
+  pointer-events: none;
 }
 
 /* Card animations */
